@@ -8,54 +8,35 @@ Original file is located at
 """
 
 import streamlit as st
-
-#from google.colab import files
-#uploaded = files.upload()  # Esto abrirá un cuadro de diálogo para seleccionar tu archivo
-
+import numpy as np
 import joblib
 
-# Cargar el modelo desde el archivo subido
-ruta_modelo = "PC_0.8722_12.04.pkl"  # Usar el nombre del archivo subido
-modelo_cargado = joblib.load(ruta_modelo)
+# Título de la app
+st.title("🔍 Predicción del Poder Calorífico (PC) del Carbón")
 
-print("✅ Modelo cargado correctamente.")
+# Cargar el modelo .pkl
+modelo = joblib.load("PC_0.8722_12.04.pkl")  # Asegúrate de que este archivo esté en tu repositorio
 
-import numpy as np
-import ipywidgets as widgets
-from IPython.display import display
+# Inputs del usuario
+st.header("📥 Ingresar datos del análisis químico")
 
-# Crear widgets de entrada para cada variable
-cenizas_bs = widgets.FloatText(description="Cenizas (BS) (%)")
-sio2_ash = widgets.FloatText(description="SiO2 ash (%)")
-al2o3_ash = widgets.FloatText(description="Al2O3 ash (%)")
-fe2o3_ash = widgets.FloatText(description="Fe2O3 ash (%)")
-cao_ash = widgets.FloatText(description="CaO ash (%)")
-mgo_ash = widgets.FloatText(description="MgO ash (%)")
-so3_ash = widgets.FloatText(description="SO3 ash (%)")
-na2o_ash = widgets.FloatText(description="Na2O ash (%)")
-k2o_ash = widgets.FloatText(description="K2O ash (%)")
-s_carbon = widgets.FloatText(description="S carbón (%)")
-cl_carbon = widgets.FloatText(description="Cl carbón (%)")
+cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
+sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
+al2o3 = st.number_input("Al2O3 ash (%)", min_value=0.0)
+fe2o3 = st.number_input("Fe2O3 ash (%)", min_value=0.0)
+cao = st.number_input("CaO ash (%)", min_value=0.0)
+mgo = st.number_input("MgO ash (%)", min_value=0.0)
+so3 = st.number_input("SO3 ash (%)", min_value=0.0)
+na2o = st.number_input("Na2O ash (%)", min_value=0.0)
+k2o = st.number_input("K2O ash (%)", min_value=0.0)
+s_carbon = st.number_input("S carbón (%)", min_value=0.0)
+cl_carbon = st.number_input("Cl carbón (%)", min_value=0.0)
 
-# Mostrar los widgets
-display(cenizas_bs, sio2_ash, al2o3_ash, fe2o3_ash, cao_ash, mgo_ash, so3_ash, na2o_ash, k2o_ash, s_carbon, cl_carbon)
+# Botón para predecir
+if st.button("🔮 Predecir Poder Calorífico"):
+    # Crear array de entrada
+    valores = np.array([[cenizas_bs, sio2, al2o3, fe2o3, cao, mgo, so3, na2o, k2o, s_carbon, cl_carbon]])
+    pc_predicho = modelo.predict(valores)[0]
 
-# Crear el botón de predicción
-boton = widgets.Button(description="Predecir Poder Calorífico")
-
-def hacer_prediccion(b):
-    # Recoger los valores de los widgets
-    valores_manual = np.array([[cenizas_bs.value, sio2_ash.value, al2o3_ash.value, fe2o3_ash.value, cao_ash.value,
-                                mgo_ash.value, so3_ash.value, na2o_ash.value, k2o_ash.value, s_carbon.value, cl_carbon.value]])
-
-    # Hacer la predicción
-    pc_predicho = modelo_cargado.predict(valores_manual)[0]
-
-    # Mostrar el resultado
-    print(f"🔹 Predicción del Poder Calorífico (PC): {pc_predicho:.2f} kcal/kg")
-
-# Asignar la función al botón
-boton.on_click(hacer_prediccion)
-
-# Mostrar el botón
-display(boton)
+    # Mostrar resultado
+    st.success(f"🔥 Poder Calorífico Predicho: {pc_predicho:.2f} kcal/kg")
