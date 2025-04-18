@@ -10,7 +10,7 @@ Original file is located at
 import streamlit as st
 
 #from google.colab import files
-uploaded = files.upload()  # Esto abrirá un cuadro de diálogo para seleccionar tu archivo
+#uploaded = files.upload()  # Esto abrirá un cuadro de diálogo para seleccionar tu archivo
 
 import joblib
 
