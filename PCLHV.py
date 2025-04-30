@@ -52,7 +52,6 @@ if mostrar_entrada_manual:
 # Botón de predicción
 if st.button("🔮 Predecir Poder Calorífico"):
     if entrada_linea:
-        # Detectar separador
         if "," in entrada_linea:
             sep = ","
         elif "\t" in entrada_linea:
@@ -74,49 +73,51 @@ if st.button("🔮 Predecir Poder Calorífico"):
     pc_predicho = modelo.predict(valores_np)[0]
     pc_entero = int(round(pc_predicho))
 
-    # Mostrar resultado
     st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
     # Guardar en historial
+    ahora = datetime.datetime.now(pytz.timezone('America/Lima')).strftime('%Y-%m-%d %H:%M:%S')
     nuevo = pd.DataFrame([{
-        "FechaHora": datetime.datetime.now(pytz.timezone('America/Lima')).strftime('%Y-%m-%d %H:%M:%S'),  # Hora de Perú, formato string
+        "FechaHora": ahora,
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
     historial = pd.read_csv(historial_path)
-    historial = pd.concat([historial, nuevo], ignore_index=True).tail(20)
+    historial = pd.concat([historial, nuevo], ignore_index=True)
     historial.to_csv(historial_path, index=False)
 
-    # Filtrar los datos de los últimos 3 días
-    fecha_3_dias_atras = datetime.datetime.now(pytz.timezone('America/Lima')) - datetime.timedelta(days=3)
+# ========== MOSTRAR GRÁFICO Y TABLA INTERACTIVA ==========
 
-    # Convertir 'FechaHora' a tipo datetime (sin modificar el formato, solo convertir la zona horaria)
-    historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
-    historial["FechaHora"] = historial["FechaHora"].dt.tz_localize('UTC').dt.tz_convert('America/Lima')  # Convertir a la zona horaria de Perú
+# Cargar historial completo
+historial = pd.read_csv(historial_path)
 
-    # Asegurarse de que 'fecha_3_dias_atras' también esté en formato datetime
-    fecha_3_dias_atras = pd.to_datetime(fecha_3_dias_atras)
+# Convertir FechaHora a datetime
+historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
 
-    # Filtrar los datos de los últimos 3 días
-    historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras] if not historial.empty else historial
+# Filtrar últimos 3 días (hora Perú)
+fecha_limite = datetime.datetime.now(pytz.timezone('America/Lima')) - datetime.timedelta(days=3)
+historial_filtrado = historial[historial["FechaHora"] >= fecha_limite] if not historial.empty else historial
 
-    # Mostrar gráfico
+# Gráfico
 st.subheader("📈 Historial de Predicciones (últimos 3 días)")
-fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
-                 size="Cenizas", color="Cenizas",
-                 hover_data=["Cenizas", "PC"],
-                 title="Predicciones de Poder Calorífico vs Cenizas",
-                 labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
-                 template="plotly_dark")
-fig.update_traces(mode="markers+lines")
-st.plotly_chart(fig, use_container_width=True)
+if not historial_filtrado.empty:
+    fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
+                     size="Cenizas", color="Cenizas",
+                     hover_data=["Cenizas", "PC"],
+                     title="Predicciones de Poder Calorífico vs Cenizas",
+                     labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                     template="plotly_dark")
+    fig.update_traces(mode="markers+lines")
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("No hay datos en los últimos 3 días para mostrar en el gráfico.")
 
-# Mostrar tabla con opción de eliminar
+# Tabla con opción de eliminar registros
 st.subheader("📋 Cuadro historial de predicciones")
 historial_mostrado = historial.copy()
 historial_mostrado["FechaHora"] = historial_mostrado["FechaHora"].dt.strftime('%Y-%m-%d %H:%M:%S')
 
-# Crear checkboxes para cada fila
+st.markdown("Seleccione los registros que desea eliminar:")
 indices_a_eliminar = []
 for i, row in historial_mostrado.iterrows():
     col1, col2 = st.columns([0.05, 0.95])
@@ -126,9 +127,9 @@ for i, row in historial_mostrado.iterrows():
     with col2:
         st.write(f"📅 {row['FechaHora']} | 🟫 Cenizas: {row['Cenizas']} | 🔥 PC: {row['PC']} kcal/kg")
 
-# Botón para eliminar seleccionados
 if indices_a_eliminar:
     if st.button("🗑️ Eliminar seleccionados"):
         historial = historial.drop(index=indices_a_eliminar).reset_index(drop=True)
         historial.to_csv(historial_path, index=False)
-        st.success("✅ Registros eliminados correctamente. Recarga la página para ver los cambios.")
+        st.success("✅ Registros eliminados correctamente.")
+        st.experimental_rerun()
