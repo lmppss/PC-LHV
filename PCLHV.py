@@ -7,31 +7,35 @@ Original file is located at
     https://colab.research.google.com/drive/1ZkgJpsrPLf54vXV3wMqcJXu2RLl27OGj
 """
 
-from datetime import datetime, timedelta
-import pytz
-import pandas as pd
-import numpy as np
-import joblib
 import streamlit as st
+import numpy as np
+import pandas as pd
+import joblib
+import datetime
+import pytz
 import plotly.express as px
 import os
 
-# Cargar modelo
+# Cargar el modelo .pkl
 modelo = joblib.load("PC_0.8722_12.04.pkl")
 
-# Ruta historial
+# Archivo temporal para guardar predicciones
 historial_path = "historial_predicciones.csv"
 if not os.path.exists(historial_path):
     pd.DataFrame(columns=["FechaHora", "Cenizas", "PC"]).to_csv(historial_path, index=False)
 
-# Streamlit App
+# Título de la app
 st.title("🔥 Predicción del Poder Calorífico del Carbón")
 st.markdown("Ingrese los datos manualmente o pegue una fila completa separada por **coma, espacio o tabulación**.")
 
+# Opción de entrada rápida
 st.subheader("📋 Entrada rápida (una línea completa)")
 entrada_linea = st.text_input("Pegue aquí una fila completa con los 11 valores en orden:")
+
+# Botón para activar la entrada manual
 mostrar_entrada_manual = st.button("📝 Mostrar entrada manual")
 
+# Si se presiona el botón, se muestran los campos de entrada manual
 if mostrar_entrada_manual:
     cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
     sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
@@ -45,6 +49,7 @@ if mostrar_entrada_manual:
     s_carbon = st.number_input("S carbón (%)", min_value=0.0)
     cl_carbon = st.number_input("Cl carbón (%)", min_value=0.0)
 
+# Botón de predicción
 if st.button("🔮 Predecir Poder Calorífico"):
     if entrada_linea:
         if "," in entrada_linea:
@@ -67,46 +72,52 @@ if st.button("🔮 Predecir Poder Calorífico"):
     valores_np = np.array(valores).reshape(1, -1)
     pc_predicho = modelo.predict(valores_np)[0]
     pc_entero = int(round(pc_predicho))
+
     st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
-    nueva_fila = pd.DataFrame([{
-        "FechaHora": datetime.now(pytz.timezone('America/Lima')).strftime('%Y-%m-%d %H:%M:%S'),
+    nuevo = pd.DataFrame([{
+        "FechaHora": datetime.datetime.now(pytz.timezone('America/Lima')).strftime('%Y-%m-%d %H:%M:%S'),
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
     historial = pd.read_csv(historial_path)
-    historial = pd.concat([historial, nueva_fila], ignore_index=True)
+    historial = pd.concat([historial, nuevo], ignore_index=True).tail(20)
     historial.to_csv(historial_path, index=False)
 
-# Leer historial actualizado
-historial = pd.read_csv(historial_path)
-historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
-historial["FechaHora"] = historial["FechaHora"].dt.tz_localize(None)
+# Mostrar gráfico
+if os.path.exists(historial_path):
+    historial = pd.read_csv(historial_path)
 
-# Mostrar gráfico con últimos 3 días
-fecha_limite = datetime.now(pytz.timezone('America/Lima')).replace(tzinfo=None) - timedelta(days=3)
-historial_filtrado = historial[historial["FechaHora"] >= fecha_limite] if not historial.empty else historial
+    if not historial.empty:
+        # Convertir fecha a datetime y zona horaria
+        historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
+        historial["FechaHora"] = historial["FechaHora"].dt.tz_localize('UTC').dt.tz_convert('America/Lima')
 
-st.subheader("📈 Historial de Predicciones")
-fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
-                 size="Cenizas", color="Cenizas",
-                 hover_data=["Cenizas", "PC"],
-                 title="Predicciones de Poder Calorífico vs Cenizas",
-                 labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
-                 template="plotly_dark")
-fig.update_traces(mode="markers+lines")
-st.plotly_chart(fig, use_container_width=True)
+        # Filtrar últimos 3 días
+        fecha_limite = pd.Timestamp.now(tz='America/Lima') - pd.Timedelta(days=3)
+        historial_filtrado = historial[historial["FechaHora"] >= fecha_limite]
 
-# Mostrar historial en tabla
-st.subheader("📋 Tabla de Historial")
-historial['FechaHora'] = historial['FechaHora'].astype(str)
-row_to_delete = st.multiselect(
-    "Seleccione filas para eliminar del historial:",
-    options=historial.index.tolist(),
-    format_func=lambda i: f"{historial.loc[i, 'FechaHora']} - {historial.loc[i, 'PC']} kcal/kg"
-)
-if st.button("🗑️ Eliminar filas seleccionadas"):
-    historial = historial.drop(index=row_to_delete)
-    historial.to_csv(historial_path, index=False)
-    st.success("✅ Filas eliminadas correctamente.")
-    st.experimental_rerun()
+        st.subheader("📈 Historial de Predicciones (últimos 3 días)")
+        fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
+                         size="Cenizas", color="Cenizas",
+                         hover_data=["Cenizas", "PC"],
+                         title="Predicciones de Poder Calorífico vs Cenizas",
+                         labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                         template="plotly_dark")
+        fig.update_traces(mode="markers+lines")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Tabla interactiva para eliminar
+        st.subheader("🧹 Eliminar predicciones del historial")
+        st.markdown("Seleccione las filas que desea eliminar:")
+
+        historial_reset = historial.reset_index(drop=True)
+        fila_editada = st.data_editor(historial_reset, num_rows="dynamic", use_container_width=True, disabled=["FechaHora", "Cenizas", "PC"], key="editor")
+
+        if st.button("🗑️ Eliminar filas seleccionadas"):
+            filas_marcadas = historial_reset.loc[~historial_reset.isin(fila_editada)].dropna()
+            if not filas_marcadas.empty:
+                historial = historial[~historial["FechaHora"].isin(filas_marcadas["FechaHora"])]
+                historial.to_csv(historial_path, index=False)
+                st.success("✅ Filas eliminadas correctamente.")
+                st.experimental_rerun()
