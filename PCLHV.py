@@ -20,7 +20,7 @@ import pytz
 st.set_page_config(layout="wide")
 
 # Cargar modelo
-modelo = joblib.load("PC_model.pkl")
+modelo = joblib.load("PC_0.8722_12.04.pkl")
 
 # Cargar historial si existe
 archivo_historial = "historial_predicciones.csv"
