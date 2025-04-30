@@ -114,7 +114,15 @@ if os.path.exists(historial_path):
         historial_reset = historial.reset_index(drop=True)
         fila_editada = st.data_editor(historial_reset, num_rows="dynamic", use_container_width=True, disabled=["FechaHora", "Cenizas", "PC"], key="editor")
 
-       if st.button("🗑️ Eliminar filas seleccionadas"):
+# Mostrar historial editable y permitir eliminación múltiple
+st.subheader("🧹 Eliminar puntos del gráfico")
+
+# Resetear el índice para mostrarlo en la tabla
+historial_reset = historial.reset_index(drop=True)
+fila_editada = st.data_editor(historial_reset, num_rows="dynamic", use_container_width=True)
+
+# Botón para eliminar las filas que fueron eliminadas en el editor
+if st.button("🗑️ Eliminar filas seleccionadas"):
     # Comparar los índices para detectar filas eliminadas
     indices_a_eliminar = historial_reset.index.difference(fila_editada.index)
     if not indices_a_eliminar.empty:
