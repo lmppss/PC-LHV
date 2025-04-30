@@ -112,15 +112,6 @@ if st.button("🔮 Predecir Poder Calorífico"):
     fig.update_traces(mode="markers+lines")
     st.plotly_chart(fig, use_container_width=True)
 
-
-    # Botón para eliminar las filas que fueron eliminadas en el editor
-    if st.button("🗑️ Eliminar filas seleccionadas"):
-        # Detectar las filas eliminadas
-        indices_a_eliminar = historial_reset.index.difference(filas_editadas.index)
-        if not indices_a_eliminar.empty:
-            historial_filtrado = historial_reset.drop(indices_a_eliminar)
-            historial_filtrado.to_csv(historial_path, index=False)
-            st.success("✅ Filas eliminadas correctamente.")
-            st.experimental_rerun()
-        else:
-            st.info("ℹ️ No se detectaron cambios para eliminar.")
+    # Mostrar historial sin opción de eliminar
+    st.subheader("📊 Historial de Predicciones")
+    st.dataframe(historial_filtrado, use_container_width=True)
