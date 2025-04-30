@@ -114,10 +114,13 @@ if os.path.exists(historial_path):
         historial_reset = historial.reset_index(drop=True)
         fila_editada = st.data_editor(historial_reset, num_rows="dynamic", use_container_width=True, disabled=["FechaHora", "Cenizas", "PC"], key="editor")
 
-        if st.button("🗑️ Eliminar filas seleccionadas"):
-            filas_marcadas = historial_reset.loc[~historial_reset.isin(fila_editada)].dropna()
-            if not filas_marcadas.empty:
-                historial = historial[~historial["FechaHora"].isin(filas_marcadas["FechaHora"])]
-                historial.to_csv(historial_path, index=False)
-                st.success("✅ Filas eliminadas correctamente.")
-                st.experimental_rerun()
+       if st.button("🗑️ Eliminar filas seleccionadas"):
+    # Comparar los índices para detectar filas eliminadas
+    indices_a_eliminar = historial_reset.index.difference(fila_editada.index)
+    if not indices_a_eliminar.empty:
+        historial_filtrado = historial_reset.drop(indices_a_eliminar)
+        historial_filtrado.to_csv(historial_path, index=False)
+        st.success("✅ Filas eliminadas correctamente.")
+        st.experimental_rerun()
+    else:
+        st.info("ℹ️ No se detectaron cambios para eliminar.")
