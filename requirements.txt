@@ -5,4 +5,3 @@ joblib
 streamlit
 scikit-learn
 plotly
-os
