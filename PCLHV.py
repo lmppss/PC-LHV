@@ -14,7 +14,6 @@ import joblib
 import datetime
 import plotly.express as px
 import os
-import pytz
 
 # Cargar el modelo .pkl
 modelo = joblib.load("PC_0.8722_12.04.pkl")
@@ -79,7 +78,7 @@ if st.button("🔮 Predecir Poder Calorífico"):
 
     # Guardar en historial
     nuevo = pd.DataFrame([{
-        "FechaHora": datetime.datetime.now(pytz.timezone("America/Lima")),
+        "FechaHora": datetime.datetime.now(),  # Se usa la hora actual de la predicción
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
@@ -88,16 +87,11 @@ if st.button("🔮 Predecir Poder Calorífico"):
     historial.to_csv(historial_path, index=False)
 
     # Filtrar los datos de los últimos 3 días
-    fecha_3_dias_atras = datetime.datetime.now(pytz.timezone("America/Lima")) - datetime.timedelta(days=3)
+    fecha_3_dias_atras = datetime.datetime.now() - datetime.timedelta(days=3)
+    historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')  # Asegurarse de que 'FechaHora' esté en formato datetime
     historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras] if not historial.empty else historial
 
-    # Si no hay datos suficientes para los últimos 3 días, mostrar todos los disponibles
-    if historial_filtrado.empty:
-        st.write("No hay datos suficientes para mostrar los últimos 3 días. Mostrando todos los datos disponibles.")
-    else:
-        st.write(f"Mostrando datos de los últimos 3 días o todos los datos disponibles: {len(historial_filtrado)} registros")
-
-    # Gráfico de dispersión
+    # Mostrar gráfico
     st.subheader("📈 Historial de Predicciones")
     fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
                      size="Cenizas", color="Cenizas",
