@@ -101,33 +101,34 @@ if st.button("🔮 Predecir Poder Calorífico"):
     historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras] if not historial.empty else historial
 
     # Mostrar gráfico
-    st.subheader("📈 Historial de Predicciones")
-    fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
-                     size="Cenizas", color="Cenizas",
-                     hover_data=["Cenizas", "PC"],
-                     title="Predicciones de Poder Calorífico vs Cenizas",
-                     labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
-                     template="plotly_dark")
+st.subheader("📈 Historial de Predicciones (últimos 3 días)")
+fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
+                 size="Cenizas", color="Cenizas",
+                 hover_data=["Cenizas", "PC"],
+                 title="Predicciones de Poder Calorífico vs Cenizas",
+                 labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                 template="plotly_dark")
+fig.update_traces(mode="markers+lines")
+st.plotly_chart(fig, use_container_width=True)
 
-    fig.update_traces(mode="markers+lines")
-    st.plotly_chart(fig, use_container_width=True)
+# Mostrar tabla con opción de eliminar
+st.subheader("📋 Cuadro historial de predicciones")
+historial_mostrado = historial.copy()
+historial_mostrado["FechaHora"] = historial_mostrado["FechaHora"].dt.strftime('%Y-%m-%d %H:%M:%S')
 
-    # Entrada para eliminar un punto
-    st.subheader("🧹 Eliminar un punto del gráfico")
-    indice_a_eliminar = st.number_input("Ingrese el índice del punto a eliminar", min_value=0, max_value=len(historial)-1)
-    if st.button("Eliminar punto"):
-        if indice_a_eliminar is not None:
-            historial = historial.drop(historial.index[indice_a_eliminar])
-            historial.to_csv(historial_path, index=False)
-            st.success("✅ Punto eliminado correctamente.")
+# Crear checkboxes para cada fila
+indices_a_eliminar = []
+for i, row in historial_mostrado.iterrows():
+    col1, col2 = st.columns([0.05, 0.95])
+    with col1:
+        if st.checkbox("", key=f"eliminar_{i}"):
+            indices_a_eliminar.append(i)
+    with col2:
+        st.write(f"📅 {row['FechaHora']} | 🟫 Cenizas: {row['Cenizas']} | 🔥 PC: {row['PC']} kcal/kg")
 
-        # Mostrar el gráfico actualizado
-        fig = px.scatter(historial, x="FechaHora", y="PC",
-                         size="Cenizas", color="Cenizas",
-                         hover_data=["Cenizas", "PC"],
-                         title="Predicciones de Poder Calorífico vs Cenizas",
-                         labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
-                         template="plotly_dark")
-
-        fig.update_traces(mode="markers+lines")
-        st.plotly_chart(fig, use_container_width=True)
+# Botón para eliminar seleccionados
+if indices_a_eliminar:
+    if st.button("🗑️ Eliminar seleccionados"):
+        historial = historial.drop(index=indices_a_eliminar).reset_index(drop=True)
+        historial.to_csv(historial_path, index=False)
+        st.success("✅ Registros eliminados correctamente. Recarga la página para ver los cambios.")
