@@ -7,35 +7,31 @@ Original file is located at
     https://colab.research.google.com/drive/1ZkgJpsrPLf54vXV3wMqcJXu2RLl27OGj
 """
 
-import streamlit as st
-import numpy as np
-import pandas as pd
-import joblib
-import datetime
+from datetime import datetime, timedelta
 import pytz
+import pandas as pd
+import numpy as np
+import joblib
+import streamlit as st
 import plotly.express as px
 import os
 
-# Cargar el modelo .pkl
+# Cargar modelo
 modelo = joblib.load("PC_0.8722_12.04.pkl")
 
-# Archivo temporal para guardar predicciones
+# Ruta historial
 historial_path = "historial_predicciones.csv"
 if not os.path.exists(historial_path):
     pd.DataFrame(columns=["FechaHora", "Cenizas", "PC"]).to_csv(historial_path, index=False)
 
-# Título de la app
+# Streamlit App
 st.title("🔥 Predicción del Poder Calorífico del Carbón")
 st.markdown("Ingrese los datos manualmente o pegue una fila completa separada por **coma, espacio o tabulación**.")
 
-# Opción de entrada rápida
 st.subheader("📋 Entrada rápida (una línea completa)")
 entrada_linea = st.text_input("Pegue aquí una fila completa con los 11 valores en orden:")
-
-# Botón para activar la entrada manual
 mostrar_entrada_manual = st.button("📝 Mostrar entrada manual")
 
-# Si se presiona el botón, se muestran los campos de entrada manual
 if mostrar_entrada_manual:
     cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
     sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
@@ -49,7 +45,6 @@ if mostrar_entrada_manual:
     s_carbon = st.number_input("S carbón (%)", min_value=0.0)
     cl_carbon = st.number_input("Cl carbón (%)", min_value=0.0)
 
-# Botón de predicción
 if st.button("🔮 Predecir Poder Calorífico"):
     if entrada_linea:
         if "," in entrada_linea:
@@ -72,64 +67,46 @@ if st.button("🔮 Predecir Poder Calorífico"):
     valores_np = np.array(valores).reshape(1, -1)
     pc_predicho = modelo.predict(valores_np)[0]
     pc_entero = int(round(pc_predicho))
-
     st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
-    # Guardar en historial
-    ahora = datetime.datetime.now(pytz.timezone('America/Lima')).strftime('%Y-%m-%d %H:%M:%S')
-    nuevo = pd.DataFrame([{
-        "FechaHora": ahora,
+    nueva_fila = pd.DataFrame([{
+        "FechaHora": datetime.now(pytz.timezone('America/Lima')).strftime('%Y-%m-%d %H:%M:%S'),
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
     historial = pd.read_csv(historial_path)
-    historial = pd.concat([historial, nuevo], ignore_index=True)
+    historial = pd.concat([historial, nueva_fila], ignore_index=True)
     historial.to_csv(historial_path, index=False)
 
-# ========== MOSTRAR GRÁFICO Y TABLA INTERACTIVA ==========
-
-# Cargar historial completo
+# Leer historial actualizado
 historial = pd.read_csv(historial_path)
-
-# Convertir FechaHora a datetime
 historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
+historial["FechaHora"] = historial["FechaHora"].dt.tz_localize(None)
 
-# Filtrar últimos 3 días (hora Perú)
-fecha_limite = datetime.datetime.now(pytz.timezone('America/Lima')) - datetime.timedelta(days=3)
+# Mostrar gráfico con últimos 3 días
+fecha_limite = datetime.now(pytz.timezone('America/Lima')).replace(tzinfo=None) - timedelta(days=3)
 historial_filtrado = historial[historial["FechaHora"] >= fecha_limite] if not historial.empty else historial
 
-# Gráfico
-st.subheader("📈 Historial de Predicciones (últimos 3 días)")
-if not historial_filtrado.empty:
-    fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
-                     size="Cenizas", color="Cenizas",
-                     hover_data=["Cenizas", "PC"],
-                     title="Predicciones de Poder Calorífico vs Cenizas",
-                     labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
-                     template="plotly_dark")
-    fig.update_traces(mode="markers+lines")
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("No hay datos en los últimos 3 días para mostrar en el gráfico.")
+st.subheader("📈 Historial de Predicciones")
+fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
+                 size="Cenizas", color="Cenizas",
+                 hover_data=["Cenizas", "PC"],
+                 title="Predicciones de Poder Calorífico vs Cenizas",
+                 labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                 template="plotly_dark")
+fig.update_traces(mode="markers+lines")
+st.plotly_chart(fig, use_container_width=True)
 
-# Tabla con opción de eliminar registros
-st.subheader("📋 Cuadro historial de predicciones")
-historial_mostrado = historial.copy()
-historial_mostrado["FechaHora"] = historial_mostrado["FechaHora"].dt.strftime('%Y-%m-%d %H:%M:%S')
-
-st.markdown("Seleccione los registros que desea eliminar:")
-indices_a_eliminar = []
-for i, row in historial_mostrado.iterrows():
-    col1, col2 = st.columns([0.05, 0.95])
-    with col1:
-        if st.checkbox("", key=f"eliminar_{i}"):
-            indices_a_eliminar.append(i)
-    with col2:
-        st.write(f"📅 {row['FechaHora']} | 🟫 Cenizas: {row['Cenizas']} | 🔥 PC: {row['PC']} kcal/kg")
-
-if indices_a_eliminar:
-    if st.button("🗑️ Eliminar seleccionados"):
-        historial = historial.drop(index=indices_a_eliminar).reset_index(drop=True)
-        historial.to_csv(historial_path, index=False)
-        st.success("✅ Registros eliminados correctamente.")
-        st.experimental_rerun()
+# Mostrar historial en tabla
+st.subheader("📋 Tabla de Historial")
+historial['FechaHora'] = historial['FechaHora'].astype(str)
+row_to_delete = st.multiselect(
+    "Seleccione filas para eliminar del historial:",
+    options=historial.index.tolist(),
+    format_func=lambda i: f"{historial.loc[i, 'FechaHora']} - {historial.loc[i, 'PC']} kcal/kg"
+)
+if st.button("🗑️ Eliminar filas seleccionadas"):
+    historial = historial.drop(index=row_to_delete)
+    historial.to_csv(historial_path, index=False)
+    st.success("✅ Filas eliminadas correctamente.")
+    st.experimental_rerun()
