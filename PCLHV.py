@@ -16,6 +16,9 @@ import pytz
 import plotly.express as px
 import os
 
+# Zona horaria de Perú
+tz_peru = pytz.timezone("America/Lima")
+
 # Cargar el modelo .pkl
 modelo = joblib.load("PC_0.8722_12.04.pkl")
 
@@ -32,11 +35,11 @@ st.markdown("Ingrese los datos manualmente o pegue una fila completa separada po
 st.subheader("📋 Entrada rápida (una línea completa)")
 entrada_linea = st.text_input("Pegue aquí una fila completa con los 11 valores en orden:")
 
-# Botón para activar la entrada manual
-mostrar_entrada_manual = st.button("📝 Mostrar entrada manual")
+# Mostrar/ocultar campos manuales
+mostrar_manual = st.checkbox("🛠️ Mostrar campos de entrada manual", value=False)
 
-# Si se presiona el botón, se muestran los campos de entrada manual
-if mostrar_entrada_manual:
+if mostrar_manual:
+    st.subheader("📝 Entrada manual campo por campo")
     cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
     sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
     al2o3 = st.number_input("Al2O3 ash (%)", min_value=0.0)
@@ -67,8 +70,11 @@ if st.button("🔮 Predecir Poder Calorífico"):
         except:
             st.error("⚠️ Error en el formato de la línea pegada.")
             st.stop()
-    else:
+    elif mostrar_manual:
         valores = [cenizas_bs, sio2, al2o3, fe2o3, cao, mgo, so3, na2o, k2o, s_carbon, cl_carbon]
+    else:
+        st.warning("Por favor, ingrese los datos en la línea rápida o active los campos manuales.")
+        st.stop()
 
     valores_np = np.array(valores).reshape(1, -1)
     pc_predicho = modelo.predict(valores_np)[0]
@@ -77,13 +83,10 @@ if st.button("🔮 Predecir Poder Calorífico"):
     # Mostrar resultado
     st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
-    # Convertir a hora de Perú
-    peru_tz = pytz.timezone('America/Lima')
-    fecha_hora_peru = datetime.datetime.now(peru_tz)
-
     # Guardar en historial
+    fecha_hora = datetime.datetime.now(tz_peru)
     nuevo = pd.DataFrame([{
-        "FechaHora": fecha_hora_peru,
+        "FechaHora": fecha_hora,
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
@@ -91,44 +94,27 @@ if st.button("🔮 Predecir Poder Calorífico"):
     historial = pd.concat([historial, nuevo], ignore_index=True)
     historial.to_csv(historial_path, index=False)
 
-    # Filtrar para mostrar solo los datos de los últimos 3 días
-    fecha_3_dias_atras = fecha_hora_peru - pd.Timedelta(days=3)
-    historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras]
+# Mostrar gráfico
+st.subheader("📈 Historial de Predicciones")
 
-    # Mostrar gráfico
-    st.subheader("📈 Historial de Predicciones")
-    fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
-                     size="Cenizas", color="Cenizas",
-                     hover_data=["Cenizas", "PC"],
-                     title="Predicciones de Poder Calorífico vs Cenizas",
-                     labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
-                     template="plotly_dark")
+# Leer historial y convertir fecha
+historial = pd.read_csv(historial_path)
+historial["FechaHora"] = pd.to_datetime(historial["FechaHora"])
 
-    fig.update_traces(mode="markers+lines")
-    fig.update_layout(
-        autosize=True,
-        margin=dict(l=50, r=50, t=50, b=50),
-        height=600
-    )
-    st.plotly_chart(fig, use_container_width=True)
+# Filtrar últimos 3 días
+fecha_actual = datetime.datetime.now(tz_peru)
+fecha_3_dias_atras = fecha_actual - datetime.timedelta(days=3)
+historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras]
 
-    # Entrada para eliminar un punto
-    st.subheader("🧹 Eliminar un punto del gráfico")
-    indice_a_eliminar = st.number_input("Ingrese el índice del punto a eliminar", min_value=0, max_value=len(historial)-1)
-    if st.button("Eliminar punto"):
-        if indice_a_eliminar is not None:
-            historial = historial.drop(historial.index[indice_a_eliminar])
-            historial.to_csv(historial_path, index=False)
-            st.success("✅ Punto eliminado correctamente.")
+# Crear gráfico
+fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
+                 size="Cenizas", color="Cenizas",
+                 hover_data=["Cenizas", "PC"],
+                 title="Predicciones de Poder Calorífico (últimos 3 días)",
+                 labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Fecha y Hora"},
+                 template="plotly_dark")
 
-        # Mostrar el gráfico actualizado
-        historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras]
-        fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
-                         size="Cenizas", color="Cenizas",
-                         hover_data=["Cenizas", "PC"],
-                         title="Predicciones de Poder Calorífico vs Cenizas",
-                         labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
-                         template="plotly_dark")
+fig.update_traces(mode="markers+lines")
+fig.update_layout(height=600)  # Agrandar gráfico
 
-        fig.update_traces(mode="markers+lines")
-        st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True)
