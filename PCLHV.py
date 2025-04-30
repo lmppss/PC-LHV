@@ -11,16 +11,29 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import joblib
-
-# Título de la app
-st.title("🔍 Predicción del Poder Calorífico (PC) del Carbón")
+import datetime
+import plotly.express as px
+import os
 
 # Cargar el modelo .pkl
-modelo = joblib.load("PC_0.8722_12.04.pkl")  # Asegúrate de que este archivo esté en el mismo directorio que el script
+modelo = joblib.load("PC_0.8722_12.04.pkl")
 
-# Inputs del usuario (10 variables, en orden y con nombres exactos)
-st.header("📥 Ingresar datos del análisis químico")
+# Archivo temporal para guardar predicciones
+historial_path = "historial_predicciones.csv"
+if not os.path.exists(historial_path):
+    pd.DataFrame(columns=["FechaHora", "Cenizas", "PC"]).to_csv(historial_path, index=False)
 
+# Título de la app
+st.title("🔥 Predicción del Poder Calorífico del Carbón")
+st.markdown("Ingrese los datos manualmente o pegue una fila completa separada por **coma, espacio o tabulación**.")
+
+# Opción de entrada rápida
+st.subheader("📋 Entrada rápida (una línea completa)")
+entrada_linea = st.text_input("Pegue aquí una fila completa con los 11 valores en orden:")
+
+# Opción de entrada manual
+st.subheader("📝 Entrada manual campo por campo")
+cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
 sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
 al2o3 = st.number_input("Al2O3 ash (%)", min_value=0.0)
 fe2o3 = st.number_input("Fe2O3 ash (%)", min_value=0.0)
@@ -32,18 +45,52 @@ k2o = st.number_input("K2O ash (%)", min_value=0.0)
 s_carbon = st.number_input("S carbón (%)", min_value=0.0)
 cl_carbon = st.number_input("Cl carbón (%)", min_value=0.0)
 
-# Crear DataFrame con nombres correctos
-columnas = [
-    'SiO2 ash (%)', 'Al2O3 ash (%)', 'Fe2O3 ash (%)', 'CaO ash (%)',
-    'MgO ash (%)', 'SO3 ash (%)', 'Na2O ash (%)', 'K2O ash (%)',
-    'S carbón (%)', 'Cl carbón (%)'
-]
-
-entrada = pd.DataFrame([[
-    sio2, al2o3, fe2o3, cao, mgo, so3, na2o, k2o, s_carbon, cl_carbon
-]], columns=columnas)
-
-# Botón para predecir
+# Botón de predicción
 if st.button("🔮 Predecir Poder Calorífico"):
-    pc_predicho = modelo.predict(entrada)[0]
-    st.success(f"🔥 Poder Calorífico Predicho: {pc_predicho:.2f} kcal/kg")
+    if entrada_linea:
+        # Detectar separador
+        if "," in entrada_linea:
+            sep = ","
+        elif "\t" in entrada_linea:
+            sep = "\t"
+        else:
+            sep = " "
+        try:
+            valores = list(map(float, entrada_linea.strip().split(sep)))
+            if len(valores) != 11:
+                st.error("⚠️ Debe ingresar exactamente 11 valores.")
+                st.stop()
+        except:
+            st.error("⚠️ Error en el formato de la línea pegada.")
+            st.stop()
+    else:
+        valores = [cenizas_bs, sio2, al2o3, fe2o3, cao, mgo, so3, na2o, k2o, s_carbon, cl_carbon]
+
+    valores_np = np.array(valores).reshape(1, -1)
+    pc_predicho = modelo.predict(valores_np)[0]
+    pc_entero = int(round(pc_predicho))
+
+    # Mostrar resultado
+    st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
+
+    # Guardar en historial
+    nuevo = pd.DataFrame([{
+        "FechaHora": datetime.datetime.now(),
+        "Cenizas": valores[0],
+        "PC": pc_entero
+    }])
+    historial = pd.read_csv(historial_path)
+    historial = pd.concat([historial, nuevo], ignore_index=True).tail(20)
+    historial.to_csv(historial_path, index=False)
+
+    # Mostrar gráfico
+    st.subheader("📈 Historial de Predicciones")
+    fig = px.scatter(historial, x="FechaHora", y="PC",
+                     size="Cenizas", color="Cenizas",
+                     hover_data=["Cenizas", "PC"],
+                     title="Predicciones de Poder Calorífico vs Cenizas",
+                     labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                     template="plotly_dark")
+
+    fig.update_traces(mode="markers+lines")
+    st.plotly_chart(fig, use_container_width=True)
