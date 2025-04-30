@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 import joblib
 import datetime
-import pytz  # Importamos la librería para manejar zonas horarias
 import plotly.express as px
 import os
 
@@ -77,13 +76,9 @@ if st.button("🔮 Predecir Poder Calorífico"):
     # Mostrar resultado
     st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
-    # Obtener la hora de Perú
-    peru_tz = pytz.timezone('America/Lima')
-    fecha_hora_peru = datetime.datetime.now(peru_tz)  # Usamos la hora de Perú
-
     # Guardar en historial
     nuevo = pd.DataFrame([{
-        "FechaHora": fecha_hora_peru,  # Se usa la hora de Perú de la predicción
+        "FechaHora": datetime.datetime.now(),
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
@@ -92,8 +87,15 @@ if st.button("🔮 Predecir Poder Calorífico"):
     historial.to_csv(historial_path, index=False)
 
     # Filtrar los datos de los últimos 3 días
-    fecha_3_dias_atras = datetime.datetime.now(peru_tz) - datetime.timedelta(days=3)
-    historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')  # Asegurarse de que 'FechaHora' esté en formato datetime
+    fecha_3_dias_atras = datetime.datetime.now() - datetime.timedelta(days=3)
+
+    # Convertir 'FechaHora' a tipo datetime, si no lo es ya
+    historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
+
+    # Asegurarse de que 'fecha_3_dias_atras' también esté en formato datetime
+    fecha_3_dias_atras = pd.to_datetime(fecha_3_dias_atras)
+
+    # Filtrar los datos de los últimos 3 días
     historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras] if not historial.empty else historial
 
     # Mostrar gráfico
@@ -113,14 +115,12 @@ if st.button("🔮 Predecir Poder Calorífico"):
     indice_a_eliminar = st.number_input("Ingrese el índice del punto a eliminar", min_value=0, max_value=len(historial)-1)
     if st.button("Eliminar punto"):
         if indice_a_eliminar is not None:
-            # Eliminar el punto seleccionado
             historial = historial.drop(historial.index[indice_a_eliminar])
             historial.to_csv(historial_path, index=False)
             st.success("✅ Punto eliminado correctamente.")
 
-        # Mostrar el gráfico actualizado sin perder el historial
-        historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras] if not historial.empty else historial
-        fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
+        # Mostrar el gráfico actualizado
+        fig = px.scatter(historial, x="FechaHora", y="PC",
                          size="Cenizas", color="Cenizas",
                          hover_data=["Cenizas", "PC"],
                          title="Predicciones de Poder Calorífico vs Cenizas",
