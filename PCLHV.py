@@ -90,12 +90,9 @@ if st.button("🔮 Predecir Poder Calorífico"):
     # Filtrar los datos de los últimos 3 días
     fecha_3_dias_atras = datetime.datetime.now(pytz.timezone('America/Lima')) - datetime.timedelta(days=3)
 
-    # Convertir 'FechaHora' a tipo datetime con zona horaria de Perú
-    try:
-        historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], format='%Y-%m-%d %H:%M:%S', errors='raise')
-    except Exception as e:
-        st.error(f"⚠️ Error al convertir la columna 'FechaHora': {str(e)}")
-        st.stop()
+    # Convertir 'FechaHora' a tipo datetime (sin modificar el formato, solo convertir la zona horaria)
+    historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
+    historial["FechaHora"] = historial["FechaHora"].dt.tz_localize('UTC').dt.tz_convert('America/Lima')  # Convertir a la zona horaria de Perú
 
     # Asegurarse de que 'fecha_3_dias_atras' también esté en formato datetime
     fecha_3_dias_atras = pd.to_datetime(fecha_3_dias_atras)
