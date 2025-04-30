@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import joblib
 import datetime
+import pytz
 import plotly.express as px
 import os
 
@@ -76,19 +77,27 @@ if st.button("🔮 Predecir Poder Calorífico"):
     # Mostrar resultado
     st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
+    # Convertir a hora de Perú
+    peru_tz = pytz.timezone('America/Lima')
+    fecha_hora_peru = datetime.datetime.now(peru_tz)
+
     # Guardar en historial
     nuevo = pd.DataFrame([{
-        "FechaHora": datetime.datetime.now(),
+        "FechaHora": fecha_hora_peru,
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
     historial = pd.read_csv(historial_path)
-    historial = pd.concat([historial, nuevo], ignore_index=True).tail(20)
+    historial = pd.concat([historial, nuevo], ignore_index=True)
     historial.to_csv(historial_path, index=False)
+
+    # Filtrar para mostrar solo los datos de los últimos 3 días
+    fecha_3_dias_atras = fecha_hora_peru - pd.Timedelta(days=3)
+    historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras]
 
     # Mostrar gráfico
     st.subheader("📈 Historial de Predicciones")
-    fig = px.scatter(historial, x="FechaHora", y="PC",
+    fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
                      size="Cenizas", color="Cenizas",
                      hover_data=["Cenizas", "PC"],
                      title="Predicciones de Poder Calorífico vs Cenizas",
@@ -96,6 +105,11 @@ if st.button("🔮 Predecir Poder Calorífico"):
                      template="plotly_dark")
 
     fig.update_traces(mode="markers+lines")
+    fig.update_layout(
+        autosize=True,
+        margin=dict(l=50, r=50, t=50, b=50),
+        height=600
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     # Entrada para eliminar un punto
@@ -108,7 +122,8 @@ if st.button("🔮 Predecir Poder Calorífico"):
             st.success("✅ Punto eliminado correctamente.")
 
         # Mostrar el gráfico actualizado
-        fig = px.scatter(historial, x="FechaHora", y="PC",
+        historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras]
+        fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
                          size="Cenizas", color="Cenizas",
                          hover_data=["Cenizas", "PC"],
                          title="Predicciones de Poder Calorífico vs Cenizas",
