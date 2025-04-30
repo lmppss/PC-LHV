@@ -97,3 +97,23 @@ if st.button("🔮 Predecir Poder Calorífico"):
 
     fig.update_traces(mode="markers+lines")
     st.plotly_chart(fig, use_container_width=True)
+
+    # Entrada para eliminar un punto
+    st.subheader("🧹 Eliminar un punto del gráfico")
+    indice_a_eliminar = st.number_input("Ingrese el índice del punto a eliminar", min_value=0, max_value=len(historial)-1)
+    if st.button("Eliminar punto"):
+        if indice_a_eliminar is not None:
+            historial = historial.drop(historial.index[indice_a_eliminar])
+            historial.to_csv(historial_path, index=False)
+            st.success("✅ Punto eliminado correctamente.")
+
+        # Mostrar el gráfico actualizado
+        fig = px.scatter(historial, x="FechaHora", y="PC",
+                         size="Cenizas", color="Cenizas",
+                         hover_data=["Cenizas", "PC"],
+                         title="Predicciones de Poder Calorífico vs Cenizas",
+                         labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                         template="plotly_dark")
+
+        fig.update_traces(mode="markers+lines")
+        st.plotly_chart(fig, use_container_width=True)
