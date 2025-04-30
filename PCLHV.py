@@ -31,19 +31,22 @@ st.markdown("Ingrese los datos manualmente o pegue una fila completa separada po
 st.subheader("📋 Entrada rápida (una línea completa)")
 entrada_linea = st.text_input("Pegue aquí una fila completa con los 11 valores en orden:")
 
-# Opción de entrada manual
-st.subheader("📝 Entrada manual campo por campo")
-cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
-sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
-al2o3 = st.number_input("Al2O3 ash (%)", min_value=0.0)
-fe2o3 = st.number_input("Fe2O3 ash (%)", min_value=0.0)
-cao = st.number_input("CaO ash (%)", min_value=0.0)
-mgo = st.number_input("MgO ash (%)", min_value=0.0)
-so3 = st.number_input("SO3 ash (%)", min_value=0.0)
-na2o = st.number_input("Na2O ash (%)", min_value=0.0)
-k2o = st.number_input("K2O ash (%)", min_value=0.0)
-s_carbon = st.number_input("S carbón (%)", min_value=0.0)
-cl_carbon = st.number_input("Cl carbón (%)", min_value=0.0)
+# Botón para activar la entrada manual
+mostrar_entrada_manual = st.button("📝 Mostrar entrada manual")
+
+# Si se presiona el botón, se muestran los campos de entrada manual
+if mostrar_entrada_manual:
+    cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
+    sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
+    al2o3 = st.number_input("Al2O3 ash (%)", min_value=0.0)
+    fe2o3 = st.number_input("Fe2O3 ash (%)", min_value=0.0)
+    cao = st.number_input("CaO ash (%)", min_value=0.0)
+    mgo = st.number_input("MgO ash (%)", min_value=0.0)
+    so3 = st.number_input("SO3 ash (%)", min_value=0.0)
+    na2o = st.number_input("Na2O ash (%)", min_value=0.0)
+    k2o = st.number_input("K2O ash (%)", min_value=0.0)
+    s_carbon = st.number_input("S carbón (%)", min_value=0.0)
+    cl_carbon = st.number_input("Cl carbón (%)", min_value=0.0)
 
 # Botón de predicción
 if st.button("🔮 Predecir Poder Calorífico"):
