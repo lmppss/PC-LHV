@@ -17,12 +17,12 @@ import plotly.express as px
 import os
 
 # Zona horaria de Perú
-tz_peru = pytz.timezone("America/Lima")
+tz = pytz.timezone("America/Lima")
 
-# Cargar el modelo .pkl
+# Cargar el modelo
 modelo = joblib.load("PC_0.8722_12.04.pkl")
 
-# Archivo temporal para guardar predicciones
+# Archivo para historial
 historial_path = "historial_predicciones.csv"
 if not os.path.exists(historial_path):
     pd.DataFrame(columns=["FechaHora", "Cenizas", "PC"]).to_csv(historial_path, index=False)
@@ -31,15 +31,12 @@ if not os.path.exists(historial_path):
 st.title("🔥 Predicción del Poder Calorífico del Carbón")
 st.markdown("Ingrese los datos manualmente o pegue una fila completa separada por **coma, espacio o tabulación**.")
 
-# Opción de entrada rápida
+# Entrada rápida
 st.subheader("📋 Entrada rápida (una línea completa)")
 entrada_linea = st.text_input("Pegue aquí una fila completa con los 11 valores en orden:")
 
-# Mostrar/ocultar campos manuales
-mostrar_manual = st.checkbox("🛠️ Mostrar campos de entrada manual", value=False)
-
-if mostrar_manual:
-    st.subheader("📝 Entrada manual campo por campo")
+# Entrada manual colapsada
+with st.expander("📝 Entrada manual campo por campo"):
     cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
     sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
     al2o3 = st.number_input("Al2O3 ash (%)", min_value=0.0)
@@ -70,23 +67,19 @@ if st.button("🔮 Predecir Poder Calorífico"):
         except:
             st.error("⚠️ Error en el formato de la línea pegada.")
             st.stop()
-    elif mostrar_manual:
-        valores = [cenizas_bs, sio2, al2o3, fe2o3, cao, mgo, so3, na2o, k2o, s_carbon, cl_carbon]
     else:
-        st.warning("Por favor, ingrese los datos en la línea rápida o active los campos manuales.")
-        st.stop()
+        valores = [cenizas_bs, sio2, al2o3, fe2o3, cao, mgo, so3, na2o, k2o, s_carbon, cl_carbon]
 
     valores_np = np.array(valores).reshape(1, -1)
     pc_predicho = modelo.predict(valores_np)[0]
     pc_entero = int(round(pc_predicho))
 
-    # Mostrar resultado
     st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
     # Guardar en historial
-    fecha_hora = datetime.datetime.now(tz_peru)
+    ahora = datetime.datetime.now(tz)
     nuevo = pd.DataFrame([{
-        "FechaHora": fecha_hora,
+        "FechaHora": ahora,
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
@@ -94,27 +87,34 @@ if st.button("🔮 Predecir Poder Calorífico"):
     historial = pd.concat([historial, nuevo], ignore_index=True)
     historial.to_csv(historial_path, index=False)
 
-# Mostrar gráfico
-st.subheader("📈 Historial de Predicciones")
-
-# Leer historial y convertir fecha
+# Leer historial actualizado
 historial = pd.read_csv(historial_path)
-historial["FechaHora"] = pd.to_datetime(historial["FechaHora"])
+historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors="coerce")
+historial = historial.dropna(subset=["FechaHora"])
 
 # Filtrar últimos 3 días
-fecha_actual = datetime.datetime.now(tz_peru)
-fecha_3_dias_atras = fecha_actual - datetime.timedelta(days=3)
+hoy = datetime.datetime.now(tz)
+fecha_3_dias_atras = hoy - datetime.timedelta(days=3)
 historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras]
 
-# Crear gráfico
+# Mostrar gráfico
+st.subheader("📈 Predicciones recientes (últimos 3 días)")
 fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
                  size="Cenizas", color="Cenizas",
                  hover_data=["Cenizas", "PC"],
-                 title="Predicciones de Poder Calorífico (últimos 3 días)",
-                 labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Fecha y Hora"},
+                 title="Poder Calorífico vs. Cenizas",
+                 labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
                  template="plotly_dark")
 
 fig.update_traces(mode="markers+lines")
 fig.update_layout(height=600)  # Agrandar gráfico
-
 st.plotly_chart(fig, use_container_width=True)
+
+# Opcional: eliminación de filas
+st.subheader("🧹 Eliminar predicciones")
+historial_reset = historial.reset_index()  # Para que tenga índice accesible
+seleccion = st.multiselect("Seleccione índices a eliminar:", historial_reset.index, format_func=lambda i: f"{historial_reset.loc[i, 'FechaHora']} - {historial_reset.loc[i, 'PC']} kcal/kg")
+if st.button("❌ Eliminar seleccionados"):
+    historial_filtrado = historial_reset.drop(seleccion)
+    historial_filtrado.to_csv(historial_path, index=False)
+    st.success("✅ Datos eliminados correctamente. Recarga la app para ver los cambios.")
