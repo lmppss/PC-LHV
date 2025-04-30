@@ -8,92 +8,123 @@ Original file is located at
 """
 
 import streamlit as st
-import pandas as pd
 import numpy as np
-import plotly.express as px
+import pandas as pd
 import joblib
-import os
 import datetime
+import plotly.express as px
+import os
 import pytz
 
-# Configuración inicial
-st.set_page_config(layout="wide")
-
-# Cargar modelo
+# Cargar el modelo .pkl
 modelo = joblib.load("PC_0.8722_12.04.pkl")
 
-# Cargar historial si existe
-archivo_historial = "historial_predicciones.csv"
-if os.path.exists(archivo_historial):
-    historial = pd.read_csv(archivo_historial)
-else:
-    historial = pd.DataFrame(columns=["FechaHora", "SiO2 (%)", "Al2O3 (%)", "Fe2O3 (%)", "CaO (%)",
-                                      "MgO (%)", "SO3 (%)", "Na2O (%)", "K2O (%)", "S carbón (%)",
-                                      "Cl carbón (%)", "Cenizas (BS) (%)", "PC predicho"])
+# Archivo temporal para guardar predicciones
+historial_path = "historial_predicciones.csv"
+if not os.path.exists(historial_path):
+    pd.DataFrame(columns=["FechaHora", "Cenizas", "PC"]).to_csv(historial_path, index=False)
 
-# Entrada manual de datos dentro de un contenedor colapsable
-with st.expander("Ingresar datos manualmente"):
-    siO2 = st.number_input("SiO2 (%)", value=0.0)
-    al2O3 = st.number_input("Al2O3 (%)", value=0.0)
-    fe2O3 = st.number_input("Fe2O3 (%)", value=0.0)
-    cao = st.number_input("CaO (%)", value=0.0)
-    mgo = st.number_input("MgO (%)", value=0.0)
-    so3 = st.number_input("SO3 (%)", value=0.0)
-    na2o = st.number_input("Na2O (%)", value=0.0)
-    k2o = st.number_input("K2O (%)", value=0.0)
-    s_carbon = st.number_input("S carbón (%)", value=0.0)
-    cl_carbon = st.number_input("Cl carbón (%)", value=0.0)
-    cenizas_bs = st.number_input("Cenizas (BS) (%)", value=0.0)
+# Título de la app
+st.title("🔥 Predicción del Poder Calorífico del Carbón")
+st.markdown("Ingrese los datos manualmente o pegue una fila completa separada por **coma, espacio o tabulación**.")
 
-    if st.button("Predecir Poder Calorífico"):
-        # Preparar datos de entrada
-        entrada = pd.DataFrame([{
-            "SiO2 (%)": siO2, "Al2O3 (%)": al2O3, "Fe2O3 (%)": fe2O3, "CaO (%)": cao,
-            "MgO (%)": mgo, "SO3 (%)": so3, "Na2O (%)": na2o, "K2O (%)": k2o,
-            "S carbón (%)": s_carbon, "Cl carbón (%)": cl_carbon, "Cenizas (BS) (%)": cenizas_bs
-        }])
+# Opción de entrada rápida
+st.subheader("📋 Entrada rápida (una línea completa)")
+entrada_linea = st.text_input("Pegue aquí una fila completa con los 11 valores en orden:")
 
-        # Realizar predicción
-        pred = modelo.predict(entrada)[0]
-        st.success(f"Poder Calorífico Inferior predicho: {pred:.2f} kcal/kg")
+# Botón para activar la entrada manual
+mostrar_entrada_manual = st.button("📝 Mostrar entrada manual")
 
-        # Obtener fecha y hora local de Perú
-        peru_tz = pytz.timezone("America/Lima")
-        ahora_peru = datetime.datetime.now(peru_tz)
+# Si se presiona el botón, se muestran los campos de entrada manual
+if mostrar_entrada_manual:
+    cenizas_bs = st.number_input("Cenizas (BS) (%)", min_value=0.0)
+    sio2 = st.number_input("SiO2 ash (%)", min_value=0.0)
+    al2o3 = st.number_input("Al2O3 ash (%)", min_value=0.0)
+    fe2o3 = st.number_input("Fe2O3 ash (%)", min_value=0.0)
+    cao = st.number_input("CaO ash (%)", min_value=0.0)
+    mgo = st.number_input("MgO ash (%)", min_value=0.0)
+    so3 = st.number_input("SO3 ash (%)", min_value=0.0)
+    na2o = st.number_input("Na2O ash (%)", min_value=0.0)
+    k2o = st.number_input("K2O ash (%)", min_value=0.0)
+    s_carbon = st.number_input("S carbón (%)", min_value=0.0)
+    cl_carbon = st.number_input("Cl carbón (%)", min_value=0.0)
 
-        # Guardar en historial
-        nuevo_registro = entrada.copy()
-        nuevo_registro["FechaHora"] = ahora_peru
-        nuevo_registro["PC predicho"] = pred
-        historial = pd.concat([historial, nuevo_registro], ignore_index=True)
-        historial.to_csv(archivo_historial, index=False)
+# Botón de predicción
+if st.button("🔮 Predecir Poder Calorífico"):
+    if entrada_linea:
+        # Detectar separador
+        if "," in entrada_linea:
+            sep = ","
+        elif "\t" in entrada_linea:
+            sep = "\t"
+        else:
+            sep = " "
+        try:
+            valores = list(map(float, entrada_linea.strip().split(sep)))
+            if len(valores) != 11:
+                st.error("⚠️ Debe ingresar exactamente 11 valores.")
+                st.stop()
+        except:
+            st.error("⚠️ Error en el formato de la línea pegada.")
+            st.stop()
+    else:
+        valores = [cenizas_bs, sio2, al2o3, fe2o3, cao, mgo, so3, na2o, k2o, s_carbon, cl_carbon]
 
-# Asegurar formato datetime para 'FechaHora'
-historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors="coerce")
-historial = historial.dropna(subset=["FechaHora"])
+    valores_np = np.array(valores).reshape(1, -1)
+    pc_predicho = modelo.predict(valores_np)[0]
+    pc_entero = int(round(pc_predicho))
 
-# Filtrar últimos 3 días
-hoy = datetime.datetime.now(pytz.timezone("America/Lima"))
-fecha_3_dias_atras = hoy - datetime.timedelta(days=3)
-historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras]
+    # Mostrar resultado
+    st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
-# Mostrar gráfico
-if not historial_filtrado.empty:
-    fig = px.scatter(
-        historial_filtrado,
-        x="FechaHora",
-        y="PC predicho",
-        size="Cenizas (BS) (%)",
-        color="Cenizas (BS) (%)",
-        title="Poder Calorífico Inferior - Últimos 3 días",
-        labels={"PC predicho": "PC (kcal/kg)"},
-        height=600  # Agrandar gráfico
-    )
-    fig.update_layout(xaxis_title="Fecha y Hora", yaxis_title="PC predicho (kcal/kg)")
+    # Guardar en historial
+    nuevo = pd.DataFrame([{
+        "FechaHora": datetime.datetime.now(pytz.timezone("America/Lima")),
+        "Cenizas": valores[0],
+        "PC": pc_entero
+    }])
+    historial = pd.read_csv(historial_path)
+    historial = pd.concat([historial, nuevo], ignore_index=True).tail(20)
+    historial.to_csv(historial_path, index=False)
+
+    # Filtrar los datos de los últimos 3 días
+    fecha_3_dias_atras = datetime.datetime.now(pytz.timezone("America/Lima")) - datetime.timedelta(days=3)
+    historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras] if not historial.empty else historial
+
+    # Si no hay datos suficientes para los últimos 3 días, mostrar todos los disponibles
+    if historial_filtrado.empty:
+        st.write("No hay datos suficientes para mostrar los últimos 3 días. Mostrando todos los datos disponibles.")
+    else:
+        st.write(f"Mostrando datos de los últimos 3 días o todos los datos disponibles: {len(historial_filtrado)} registros")
+
+    # Gráfico de dispersión
+    st.subheader("📈 Historial de Predicciones")
+    fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
+                     size="Cenizas", color="Cenizas",
+                     hover_data=["Cenizas", "PC"],
+                     title="Predicciones de Poder Calorífico vs Cenizas",
+                     labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                     template="plotly_dark")
+
+    fig.update_traces(mode="markers+lines")
     st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("No hay datos de los últimos 3 días para mostrar en el gráfico.")
 
-# Mostrar historial completo si se desea
-with st.expander("Ver historial completo"):
-    st.dataframe(historial.sort_values("FechaHora", ascending=False), use_container_width=True)
+    # Entrada para eliminar un punto
+    st.subheader("🧹 Eliminar un punto del gráfico")
+    indice_a_eliminar = st.number_input("Ingrese el índice del punto a eliminar", min_value=0, max_value=len(historial)-1)
+    if st.button("Eliminar punto"):
+        if indice_a_eliminar is not None:
+            historial = historial.drop(historial.index[indice_a_eliminar])
+            historial.to_csv(historial_path, index=False)
+            st.success("✅ Punto eliminado correctamente.")
+
+        # Mostrar el gráfico actualizado
+        fig = px.scatter(historial, x="FechaHora", y="PC",
+                         size="Cenizas", color="Cenizas",
+                         hover_data=["Cenizas", "PC"],
+                         title="Predicciones de Poder Calorífico vs Cenizas",
+                         labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                         template="plotly_dark")
+
+        fig.update_traces(mode="markers+lines")
+        st.plotly_chart(fig, use_container_width=True)
