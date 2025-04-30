@@ -52,6 +52,7 @@ if mostrar_entrada_manual:
 # Botón de predicción
 if st.button("🔮 Predecir Poder Calorífico"):
     if entrada_linea:
+        # Detectar separador
         if "," in entrada_linea:
             sep = ","
         elif "\t" in entrada_linea:
@@ -73,10 +74,12 @@ if st.button("🔮 Predecir Poder Calorífico"):
     pc_predicho = modelo.predict(valores_np)[0]
     pc_entero = int(round(pc_predicho))
 
+    # Mostrar resultado
     st.success(f"🔥 Poder Calorífico Predicho: **{pc_entero} kcal/kg**")
 
+    # Guardar en historial
     nuevo = pd.DataFrame([{
-        "FechaHora": datetime.datetime.now(pytz.timezone('America/Lima')).strftime('%Y-%m-%d %H:%M:%S'),
+        "FechaHora": datetime.datetime.now(pytz.timezone('America/Lima')).strftime('%Y-%m-%d %H:%M:%S'),  # Hora de Perú, formato string
         "Cenizas": valores[0],
         "PC": pc_entero
     }])
@@ -84,51 +87,40 @@ if st.button("🔮 Predecir Poder Calorífico"):
     historial = pd.concat([historial, nuevo], ignore_index=True).tail(20)
     historial.to_csv(historial_path, index=False)
 
-# Mostrar gráfico
-if os.path.exists(historial_path):
-    historial = pd.read_csv(historial_path)
+    # Filtrar los datos de los últimos 3 días
+    fecha_3_dias_atras = datetime.datetime.now(pytz.timezone('America/Lima')) - datetime.timedelta(days=3)
 
-    if not historial.empty:
-        # Convertir fecha a datetime y zona horaria
-        historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
-        historial["FechaHora"] = historial["FechaHora"].dt.tz_localize('UTC').dt.tz_convert('America/Lima')
+    # Convertir 'FechaHora' a tipo datetime (sin modificar el formato, solo convertir la zona horaria)
+    historial["FechaHora"] = pd.to_datetime(historial["FechaHora"], errors='coerce')
+    historial["FechaHora"] = historial["FechaHora"].dt.tz_localize('UTC').dt.tz_convert('America/Lima')  # Convertir a la zona horaria de Perú
 
-        # Filtrar últimos 3 días
-        fecha_limite = pd.Timestamp.now(tz='America/Lima') - pd.Timedelta(days=3)
-        historial_filtrado = historial[historial["FechaHora"] >= fecha_limite]
+    # Asegurarse de que 'fecha_3_dias_atras' también esté en formato datetime
+    fecha_3_dias_atras = pd.to_datetime(fecha_3_dias_atras)
 
-        st.subheader("📈 Historial de Predicciones (últimos 3 días)")
-        fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
-                         size="Cenizas", color="Cenizas",
-                         hover_data=["Cenizas", "PC"],
-                         title="Predicciones de Poder Calorífico vs Cenizas",
-                         labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
-                         template="plotly_dark")
-        fig.update_traces(mode="markers+lines")
-        st.plotly_chart(fig, use_container_width=True)
+    # Filtrar los datos de los últimos 3 días
+    historial_filtrado = historial[historial["FechaHora"] >= fecha_3_dias_atras] if not historial.empty else historial
 
-        # Tabla interactiva para eliminar
-        st.subheader("🧹 Eliminar predicciones del historial")
-        st.markdown("Seleccione las filas que desea eliminar:")
+    # Mostrar gráfico
+    st.subheader("📈 Historial de Predicciones")
+    fig = px.scatter(historial_filtrado, x="FechaHora", y="PC",
+                     size="Cenizas", color="Cenizas",
+                     hover_data=["Cenizas", "PC"],
+                     title="Predicciones de Poder Calorífico vs Cenizas",
+                     labels={"PC": "Poder Calorífico (kcal/kg)", "FechaHora": "Hora"},
+                     template="plotly_dark")
 
-        historial_reset = historial.reset_index(drop=True)
-        fila_editada = st.data_editor(historial_reset, num_rows="dynamic", use_container_width=True, disabled=["FechaHora", "Cenizas", "PC"], key="editor")
+    fig.update_traces(mode="markers+lines")
+    st.plotly_chart(fig, use_container_width=True)
 
-# Mostrar historial editable y permitir eliminación múltiple
-st.subheader("🧹 Eliminar puntos del gráfico")
 
-# Resetear el índice para mostrarlo en la tabla
-historial_reset = historial.reset_index(drop=True)
-fila_editada = st.data_editor(historial_reset, num_rows="dynamic", use_container_width=True)
-
-# Botón para eliminar las filas que fueron eliminadas en el editor
-if st.button("🗑️ Eliminar filas seleccionadas"):
-    # Comparar los índices para detectar filas eliminadas
-    indices_a_eliminar = historial_reset.index.difference(fila_editada.index)
-    if not indices_a_eliminar.empty:
-        historial_filtrado = historial_reset.drop(indices_a_eliminar)
-        historial_filtrado.to_csv(historial_path, index=False)
-        st.success("✅ Filas eliminadas correctamente.")
-        st.experimental_rerun()
-    else:
-        st.info("ℹ️ No se detectaron cambios para eliminar.")
+    # Botón para eliminar las filas que fueron eliminadas en el editor
+    if st.button("🗑️ Eliminar filas seleccionadas"):
+        # Detectar las filas eliminadas
+        indices_a_eliminar = historial_reset.index.difference(filas_editadas.index)
+        if not indices_a_eliminar.empty:
+            historial_filtrado = historial_reset.drop(indices_a_eliminar)
+            historial_filtrado.to_csv(historial_path, index=False)
+            st.success("✅ Filas eliminadas correctamente.")
+            st.experimental_rerun()
+        else:
+            st.info("ℹ️ No se detectaron cambios para eliminar.")
